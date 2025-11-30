@@ -12,5 +12,6 @@ class ErrorMessages
     public const VALIDATION_FAILED = 'Validation failed';
     public const UNAUTHORIZED = 'Unauthorized access';
     public const SERVER_ERROR = 'An unexpected error occurred';
+    public const USER_ID_NOT_FOUND = 'UserId not found';
 }
 

@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Constants\ErrorMessages;
 use App\Constants\SuccessMessages;
+use App\Http\Requests\StoreUserRequest;
+use App\Http\Requests\UpdateUserRequest;
+
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Http\Request;
+
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
 
@@ -34,20 +37,17 @@ class UserController extends Controller
     /**
      * Store a newly created resource in storage.
      */
-    public function store(Request $request): JsonResponse
+    public function store(StoreUserRequest $request): JsonResponse
     {
-        try {
-            $validated = $request->validate([
-                'name' => 'required|string|max:100',
-                'email' => 'required|string|email|max:100|unique:users',
-                'password' => 'required|string|min:8|confirmed',
-            ]);
 
-            $user = User::create([
-                'name' => $validated['name'],
-                'email' => $validated['email'],
-                'password' => Hash::make($validated['password']),
-            ]);
+        $data = $request->validated();
+
+        try {
+
+            $user = new User();
+            $user->fill($data);
+            $user->password = Hash::make($data['password']);
+            $user->save();
 
             return response()->json([
                 'message' => __(SuccessMessages::USER_CREATED),
@@ -57,7 +57,7 @@ class UserController extends Controller
             return response()->json([
                 'error' => __(ErrorMessages::VALIDATION_FAILED),
                 'details' => $e->errors(),
-            ], 422);
+            ], 400);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => __(ErrorMessages::USER_CREATION_FAILED),
@@ -70,6 +70,10 @@ class UserController extends Controller
      */
     public function show(int $id): JsonResponse
     {
+        if (!$id) return response()->json([
+            'error' => __(e(ErrorMessages::USER_ID_NOT_FOUND)),
+        ], 404);
+
         try {
             $user = User::findOrFail($id);
 
@@ -87,32 +91,28 @@ class UserController extends Controller
     /**
      * Update the specified resource in storage.
      */
-    public function update(Request $request, int $id): JsonResponse
+    public function update(UpdateUserRequest $request, int $id): JsonResponse
     {
+        if (!$id) return response()->json([
+            'error' => __(e(ErrorMessages::USER_ID_NOT_FOUND)),
+        ], 404);
+
+        $data = $request->validated();
+
         try {
+
             $user = User::findOrFail($id);
-
-            $validated = $request->validate([
-                'name' => 'sometimes|required|string|max:100',
-                'email' => 'sometimes|required|string|email|max:100|unique:users,email,'.$id,
-                'password' => 'sometimes|required|string|min:8|confirmed',
-            ]);
-
-            if (isset($validated['password'])) {
-                $validated['password'] = Hash::make($validated['password']);
-            }
-
-            $user->update($validated);
+            $user->save();
 
             return response()->json([
                 'message' => __(SuccessMessages::USER_UPDATED),
-                'data' => $user->fresh(),
-            ], 200);
+                'data' => $user,
+            ], 201);
         } catch (ValidationException $e) {
             return response()->json([
                 'error' => __(ErrorMessages::VALIDATION_FAILED),
                 'details' => $e->errors(),
-            ], 422);
+            ], 400);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => __(ErrorMessages::USER_UPDATE_FAILED),
@@ -125,6 +125,10 @@ class UserController extends Controller
      */
     public function destroy(int $id): JsonResponse
     {
+        if (!$id) return response()->json([
+            'error' => __(e(ErrorMessages::USER_ID_NOT_FOUND)),
+        ], 404);
+
         try {
             $user = User::findOrFail($id);
             $user->delete();
