@@ -1,15 +1,19 @@
 <?php
 
 use App\Http\Controllers\UserController;
-use App\Models\User;
-use Illuminate\Http\Request;
+use App\Http\Controllers\AuthController;
 use Illuminate\Support\Facades\Route;
 
-// Route::get('/user', function (Request $request) {
-//     return $request->user();
-// })->middleware('auth:sanctum');
+/*
+| Public auth endpoints
+*/
+Route::post('register', [AuthController::class, 'register']);
+Route::post('login', [AuthController::class, 'login']);
 
-
-// Route::get('users', [UserController::class, 'index']);
-
-Route::apiResource('users', UserController::class);
+/*
+| Protected API (requires sanctum token / session)
+*/
+Route::middleware('auth:sanctum')->group(function () {
+    Route::apiResource('users', UserController::class);
+    Route::post('logout', [AuthController::class, 'logout']);
+});
