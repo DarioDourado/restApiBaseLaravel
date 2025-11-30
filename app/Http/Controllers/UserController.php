@@ -3,9 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Constants\ErrorMessages;
+use App\Constants\SuccessMessages;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\ValidationException;
 
 class UserController extends Controller
 {
@@ -17,7 +20,10 @@ class UserController extends Controller
         try {
             $users = User::all();
 
-            return response()->json($users, 200);
+            return response()->json([
+                'message' => __(SuccessMessages::USER_RETRIEVED),
+                'data' => $users,
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => __(ErrorMessages::USER_RETRIEVAL_FAILED),
@@ -30,7 +36,33 @@ class UserController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        return response()->json(['message' => 'Not implemented'], 501);
+        try {
+            $validated = $request->validate([
+                'name' => 'required|string|max:100',
+                'email' => 'required|string|email|max:100|unique:users',
+                'password' => 'required|string|min:8|confirmed',
+            ]);
+
+            $user = User::create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => Hash::make($validated['password']),
+            ]);
+
+            return response()->json([
+                'message' => __(SuccessMessages::USER_CREATED),
+                'data' => $user,
+            ], 201);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'error' => __(ErrorMessages::VALIDATION_FAILED),
+                'details' => $e->errors(),
+            ], 422);
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => __(ErrorMessages::USER_CREATION_FAILED),
+            ], 500);
+        }
     }
 
     /**
@@ -41,7 +73,10 @@ class UserController extends Controller
         try {
             $user = User::findOrFail($id);
 
-            return response()->json($user, 200);
+            return response()->json([
+                'message' => __(SuccessMessages::USER_FOUND),
+                'data' => $user,
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
                 'error' => __(ErrorMessages::USER_NOT_FOUND),
@@ -57,11 +92,31 @@ class UserController extends Controller
         try {
             $user = User::findOrFail($id);
 
-            return response()->json($user, 200);
+            $validated = $request->validate([
+                'name' => 'sometimes|required|string|max:100',
+                'email' => 'sometimes|required|string|email|max:100|unique:users,email,'.$id,
+                'password' => 'sometimes|required|string|min:8|confirmed',
+            ]);
+
+            if (isset($validated['password'])) {
+                $validated['password'] = Hash::make($validated['password']);
+            }
+
+            $user->update($validated);
+
+            return response()->json([
+                'message' => __(SuccessMessages::USER_UPDATED),
+                'data' => $user->fresh(),
+            ], 200);
+        } catch (ValidationException $e) {
+            return response()->json([
+                'error' => __(ErrorMessages::VALIDATION_FAILED),
+                'details' => $e->errors(),
+            ], 422);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => __(ErrorMessages::USER_NOT_FOUND),
-            ], 404);
+                'error' => __(ErrorMessages::USER_UPDATE_FAILED),
+            ], 500);
         }
     }
 
@@ -74,10 +129,12 @@ class UserController extends Controller
             $user = User::findOrFail($id);
             $user->delete();
 
-            return response()->json(null, 204);
+            return response()->json([
+                'message' => __(SuccessMessages::USER_DELETED),
+            ], 200);
         } catch (\Exception $e) {
             return response()->json([
-                'error' => __(ErrorMessages::USER_NOT_FOUND),
+                'error' => __(ErrorMessages::USER_DELETION_FAILED),
             ], 404);
         }
     }
